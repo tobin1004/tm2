@@ -78,20 +78,27 @@
 
 
     <script>
+
         // Teachable Machine 모델 경로
-        const URL = "./my_model/";
+        const MODEL_URL = "./my_model/";
 
         let model;
 
         // 모델 불러오기
         async function init() {
 
-            const modelURL = URL + "model.json";
-            const metadataURL = URL + "metadata.json";
+            try {
+                const modelURL = MODEL_URL + "model.json";
+                const metadataURL = MODEL_URL + "metadata.json";
 
-            model = await tmImage.load(modelURL, metadataURL);
+                model = await tmImage.load(modelURL, metadataURL);
 
-            console.log("모델 로딩 완료");
+                console.log("모델 로딩 완료");
+
+            } catch (error) {
+                console.error("모델 로딩 실패:", error);
+                alert("모델을 불러오지 못했습니다. my_model 폴더를 확인하세요.");
+            }
         }
 
 
@@ -105,11 +112,14 @@
 
                 const image = document.getElementById("preview");
 
-                image.src = URL.createObjectURL(file);
+                // 이미지 임시 주소 생성
+                image.src = window.URL.createObjectURL(file);
+
                 image.style.display = "block";
 
                 document.getElementById("result").innerHTML = "";
                 document.getElementById("label-container").innerHTML = "";
+
             });
 
 
@@ -128,47 +138,54 @@
                 return;
             }
 
-            // 이미지 분류 실행
-            const prediction = await model.predict(image);
+            try {
 
-            // 가장 높은 확률의 클래스 찾기
-            let bestPrediction = prediction[0];
+                // 이미지 분류 실행
+                const prediction = await model.predict(image);
 
-            for (let i = 1; i < prediction.length; i++) {
+                // 가장 높은 확률의 클래스 찾기
+                let bestPrediction = prediction[0];
 
-                if (prediction[i].probability >
-                    bestPrediction.probability) {
+                for (let i = 1; i < prediction.length; i++) {
 
-                    bestPrediction = prediction[i];
+                    if (prediction[i].probability >
+                        bestPrediction.probability) {
+
+                        bestPrediction = prediction[i];
+                    }
                 }
-            }
 
-            // 클래스 이름과 확률
-            const animal = bestPrediction.className;
-            const probability = bestPrediction.probability;
+                // 클래스 이름과 확률
+                const animal = bestPrediction.className;
+                const probability = bestPrediction.probability;
 
-            // 최종 결과 출력
-            document.getElementById("result").innerHTML =
-                `당신은 "${animal}"상입니다!<br>
-                 (${(probability * 100).toFixed(1)}% 확률)`;
+                // 최종 결과 출력
+                document.getElementById("result").innerHTML =
+                    `당신은 "${animal}"상입니다!<br>
+                     (${(probability * 100).toFixed(1)}% 확률)`;
 
-            // 클래스별 예측 결과 출력
-            const labelContainer =
-                document.getElementById("label-container");
+                // 클래스별 예측 결과 출력
+                const labelContainer =
+                    document.getElementById("label-container");
 
-            labelContainer.innerHTML = "<h3>분류별 인식 결과</h3>";
+                labelContainer.innerHTML = "<h3>분류별 인식 결과</h3>";
 
-            for (let i = 0; i < prediction.length; i++) {
+                for (let i = 0; i < prediction.length; i++) {
 
-                const className = prediction[i].className;
-                const score = prediction[i].probability;
+                    const className = prediction[i].className;
+                    const score = prediction[i].probability;
 
-                const div = document.createElement("div");
+                    const div = document.createElement("div");
 
-                div.innerHTML =
-                    `${className} : ${(score * 100).toFixed(1)}%`;
+                    div.innerHTML =
+                        `${className} : ${(score * 100).toFixed(1)}%`;
 
-                labelContainer.appendChild(div);
+                    labelContainer.appendChild(div);
+                }
+
+            } catch (error) {
+                console.error("이미지 분석 실패:", error);
+                alert("이미지 분석 중 오류가 발생했습니다.");
             }
         }
 
