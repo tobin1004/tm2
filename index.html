@@ -1,18 +1,16 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>인물별 동물상 테스트</title>
 
-    <!-- TensorFlow.js -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <!-- TensorFlow.js (버전 고정: PC/모바일 동일 버전 보장) -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
 
-    <!-- Teachable Machine -->
-    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <!-- Teachable Machine (버전 고정) -->
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
 
     <style>
         * {
@@ -118,6 +116,18 @@
             line-height: 1.7;
         }
 
+        #debug-container {
+            margin: 15px auto;
+            font-size: 12px;
+            color: #777;
+        }
+
+        #debug-container canvas {
+            display: block;
+            margin: 8px auto;
+            border: 1px solid #ccc;
+        }
+
         @media (max-width: 600px) {
             body {
                 margin: 10px;
@@ -145,30 +155,19 @@
     </p>
 
     <!-- 이미지 업로드 -->
-    <input
-        type="file"
-        id="image-upload"
-        accept="image/*"
-    >
+    <input type="file" id="image-upload" accept="image/*">
 
     <br>
 
     <!-- 이미지 미리보기 -->
-    <img
-        id="preview"
-        alt="업로드 이미지 미리보기"
-    >
+    <img id="preview" alt="업로드 이미지 미리보기">
 
     <div id="image-info"></div>
 
     <br>
 
     <!-- 분석 버튼 -->
-    <button
-        type="button"
-        id="analyze-button"
-        disabled
-    >
+    <button type="button" id="analyze-button" disabled>
         동물상 분석하기
     </button>
 
@@ -183,6 +182,9 @@
     <!-- 클래스별 확률 -->
     <div id="label-container"></div>
 
+    <!-- 디버그: 모델에 실제로 들어간 224x224 이미지 (DEBUG_PREPROCESS = true 일 때만 표시) -->
+    <div id="debug-container"></div>
+
 
     <script>
 
@@ -195,6 +197,13 @@
         // Teachable Machine 기본 이미지 입력 크기
         const IMAGE_SIZE = 224;
 
+        // 전처리 중간 단계 해상도 (기기와 상관없이 고정)
+        const MID_SIZE = 512;
+
+        // true로 바꾸면 모델에 들어간 224x224 이미지와 백엔드 정보를 화면에 표시
+        // (PC와 모바일 결과를 비교할 때 사용)
+        const DEBUG_PREPROCESS = false;
+
         let model = null;
 
         let modelReady = false;
@@ -203,31 +212,22 @@
 
         let currentObjectURL = null;
 
+        // EXIF 회전이 적용된 이미지 비트맵 (분석에 사용)
+        let currentBitmap = null;
+
 
         // =====================================
         // 2. HTML 요소 가져오기
         // =====================================
 
-        const uploadInput =
-            document.getElementById("image-upload");
-
-        const preview =
-            document.getElementById("preview");
-
-        const analyzeButton =
-            document.getElementById("analyze-button");
-
-        const status =
-            document.getElementById("status");
-
-        const result =
-            document.getElementById("result");
-
-        const labelContainer =
-            document.getElementById("label-container");
-
-        const imageInfo =
-            document.getElementById("image-info");
+        const uploadInput = document.getElementById("image-upload");
+        const preview = document.getElementById("preview");
+        const analyzeButton = document.getElementById("analyze-button");
+        const status = document.getElementById("status");
+        const result = document.getElementById("result");
+        const labelContainer = document.getElementById("label-container");
+        const imageInfo = document.getElementById("image-info");
+        const debugContainer = document.getElementById("debug-container");
 
 
         // =====================================
@@ -252,8 +252,7 @@
 
             try {
 
-                status.textContent =
-                    "TensorFlow.js 초기화 중...";
+                status.textContent = "TensorFlow.js 초기화 중...";
 
                 // PC와 모바일의 연산 백엔드 통일
                 await tf.setBackend("cpu");
@@ -261,58 +260,38 @@
                 // TensorFlow 초기화 완료 대기
                 await tf.ready();
 
-                console.log(
-                    "TensorFlow Backend:",
-                    tf.getBackend()
-                );
+                console.log("TensorFlow Backend:", tf.getBackend());
+                console.log("TensorFlow Version:", tf.version.tfjs);
 
-                status.textContent =
-                    "AI 모델을 불러오는 중입니다...";
+                status.textContent = "AI 모델을 불러오는 중입니다...";
 
-                const modelURL =
-                    MODEL_URL + "model.json";
-
-                const metadataURL =
-                    MODEL_URL + "metadata.json";
+                const modelURL = MODEL_URL + "model.json";
+                const metadataURL = MODEL_URL + "metadata.json";
 
                 // Teachable Machine 모델 로딩
-                model = await tmImage.load(
-                    modelURL,
-                    metadataURL
-                );
+                model = await tmImage.load(modelURL, metadataURL);
 
                 modelReady = true;
 
                 console.log("모델 로딩 완료");
+                console.log("클래스 목록:", model.getClassLabels());
 
-                console.log(
-                    "클래스 목록:",
-                    model.getClassLabels()
-                );
+                status.textContent = "모델 로딩 완료! 이미지를 업로드하세요.";
 
-                console.log(
-                    "TensorFlow Backend:",
-                    tf.getBackend()
-                );
-
-                status.textContent =
-                    "모델 로딩 완료! 이미지를 업로드하세요.";
+                if (DEBUG_PREPROCESS) {
+                    status.textContent +=
+                        ` (backend: ${tf.getBackend()}, tfjs: ${tf.version.tfjs})`;
+                }
 
                 updateButton();
 
             } catch (error) {
 
-                console.error(
-                    "모델 로딩 오류:",
-                    error
-                );
+                console.error("모델 로딩 오류:", error);
 
-                status.textContent =
-                    "모델 로딩에 실패했습니다.";
+                status.textContent = "모델 로딩에 실패했습니다.";
 
-                alert(
-                    "AI 모델을 불러오지 못했습니다. 모델 폴더를 확인하세요."
-                );
+                alert("AI 모델을 불러오지 못했습니다. 모델 폴더를 확인하세요.");
 
             }
 
@@ -323,146 +302,152 @@
         // 5. 이미지 업로드
         // =====================================
 
-        uploadInput.addEventListener(
-            "change",
-            async function(event) {
+        uploadInput.addEventListener("change", async function (event) {
 
-                const file = event.target.files[0];
+            const file = event.target.files[0];
 
-                if (!file) return;
+            if (!file) return;
 
-                // 이미지 파일 확인
-                if (!file.type.startsWith("image/")) {
+            // 이미지 파일 확인
+            if (!file.type.startsWith("image/")) {
 
-                    alert("이미지 파일만 업로드할 수 있습니다.");
+                alert("이미지 파일만 업로드할 수 있습니다.");
 
-                    uploadInput.value = "";
+                uploadInput.value = "";
 
-                    return;
+                return;
+
+            }
+
+            // 이전 결과 초기화
+            result.textContent = "";
+            labelContainer.innerHTML = "";
+            debugContainer.innerHTML = "";
+            imageInfo.textContent = "";
+
+            imageReady = false;
+
+            updateButton();
+
+            try {
+
+                // 이전 임시 URL / 비트맵 해제
+                if (currentObjectURL) {
+                    URL.revokeObjectURL(currentObjectURL);
+                }
+
+                if (currentBitmap && currentBitmap.close) {
+                    currentBitmap.close();
+                }
+
+                currentBitmap = null;
+
+                // 새로운 이미지 URL 생성 (미리보기용)
+                currentObjectURL = URL.createObjectURL(file);
+
+                preview.src = currentObjectURL;
+                preview.style.display = "block";
+
+                // 이미지 디코딩 완료 대기
+                await preview.decode();
+
+                // EXIF 회전을 일관되게 적용한 비트맵 생성
+                // (지원하지 않는 브라우저에서는 <img>를 그대로 사용)
+                let width = preview.naturalWidth;
+                let height = preview.naturalHeight;
+
+                if (window.createImageBitmap) {
+
+                    try {
+
+                        currentBitmap = await createImageBitmap(file, {
+                            imageOrientation: "from-image"
+                        });
+
+                        width = currentBitmap.width;
+                        height = currentBitmap.height;
+
+                    } catch (bitmapError) {
+
+                        console.warn(
+                            "createImageBitmap 실패, <img>로 대체:",
+                            bitmapError
+                        );
+
+                        currentBitmap = null;
+
+                    }
 
                 }
 
-                // 이전 결과 초기화
-                result.textContent = "";
+                if (width === 0 || height === 0) {
 
-                labelContainer.innerHTML = "";
+                    throw new Error("이미지 크기를 확인할 수 없습니다.");
 
-                imageInfo.textContent = "";
+                }
+
+                imageReady = true;
+
+                imageInfo.textContent = `원본 크기: ${width} × ${height}`;
+
+                status.textContent = "이미지 업로드 완료! 분석할 수 있습니다.";
+
+                console.log("업로드 파일:", file.name);
+                console.log("파일 크기:", file.size, "bytes");
+                console.log("이미지 실제 크기:", width, height);
+
+                updateButton();
+
+            } catch (error) {
+
+                console.error("이미지 업로드 오류:", error);
+
+                status.textContent = "이미지를 불러오지 못했습니다.";
+
+                alert("이미지를 읽을 수 없습니다. JPG 또는 PNG 파일을 사용해 주세요.");
 
                 imageReady = false;
 
                 updateButton();
 
-                try {
-
-                    // 이전 임시 URL 해제
-                    if (currentObjectURL) {
-
-                        URL.revokeObjectURL(
-                            currentObjectURL
-                        );
-
-                    }
-
-                    // 새로운 이미지 URL 생성
-                    currentObjectURL =
-                        URL.createObjectURL(file);
-
-                    // 이미지 미리보기
-                    preview.src = currentObjectURL;
-
-                    preview.style.display = "block";
-
-                    // 이미지 디코딩 완료 대기
-                    await preview.decode();
-
-                    // 이미지 정보
-                    const width = preview.naturalWidth;
-                    const height = preview.naturalHeight;
-
-                    if (width === 0 || height === 0) {
-
-                        throw new Error(
-                            "이미지 크기를 확인할 수 없습니다."
-                        );
-
-                    }
-
-                    imageReady = true;
-
-                    imageInfo.textContent =
-                        `원본 크기: ${width} × ${height}`;
-
-                    status.textContent =
-                        "이미지 업로드 완료! 분석할 수 있습니다.";
-
-                    console.log("업로드 파일:", file.name);
-
-                    console.log(
-                        "파일 크기:",
-                        file.size,
-                        "bytes"
-                    );
-
-                    console.log(
-                        "이미지 실제 크기:",
-                        width,
-                        height
-                    );
-
-                    updateButton();
-
-                } catch (error) {
-
-                    console.error(
-                        "이미지 업로드 오류:",
-                        error
-                    );
-
-                    status.textContent =
-                        "이미지를 불러오지 못했습니다.";
-
-                    alert(
-                        "이미지를 읽을 수 없습니다. JPG 또는 PNG 파일을 사용해 주세요."
-                    );
-
-                    imageReady = false;
-
-                    updateButton();
-
-                }
-
             }
-        );
+
+        });
 
 
         // =====================================
-        // 6. 이미지 전처리
+        // 6. 이미지 전처리 (기기 간 결과 차이 최소화)
         // =====================================
 
-        function preprocessImage(image) {
+        function createSquareCanvas(sizePx) {
 
-            // 정사각형 Canvas 생성
-            const canvas =
-                document.createElement("canvas");
+            const canvas = document.createElement("canvas");
 
-            canvas.width = IMAGE_SIZE;
-            canvas.height = IMAGE_SIZE;
+            canvas.width = sizePx;
+            canvas.height = sizePx;
 
-            const ctx = canvas.getContext("2d", {
-                alpha: false
-            });
+            const ctx = canvas.getContext("2d");
 
             if (!ctx) {
-
-                throw new Error(
-                    "Canvas를 생성할 수 없습니다."
-                );
-
+                throw new Error("Canvas를 생성할 수 없습니다.");
             }
 
-            const width = image.naturalWidth;
-            const height = image.naturalHeight;
+            // 투명 PNG가 검은 배경으로 처리되지 않도록 흰색으로 먼저 채움
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, sizePx, sizePx);
+
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+
+            return { canvas, ctx };
+
+        }
+
+        function preprocessImage(source) {
+
+            // source: ImageBitmap 또는 HTMLImageElement
+            const width = source.naturalWidth || source.width;
+            const height = source.naturalHeight || source.height;
 
             // 중앙 크롭을 위한 정사각형 영역 계산
             const size = Math.min(width, height);
@@ -470,30 +455,31 @@
             const sx = (width - size) / 2;
             const sy = (height - size) / 2;
 
-            // 이미지 품질 설정
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = "high";
+            // 1단계: 중앙 정사각형을 고정 해상도(512x512)로 변환
+            const mid = createSquareCanvas(MID_SIZE);
 
-            // 중앙 영역을 224 × 224로 변환
-            ctx.drawImage(
-                image,
-                sx,
-                sy,
-                size,
-                size,
-                0,
-                0,
-                IMAGE_SIZE,
-                IMAGE_SIZE
+            mid.ctx.drawImage(
+                source,
+                sx, sy, size, size,
+                0, 0, MID_SIZE, MID_SIZE
+            );
+
+            // 2단계: 512 -> 224
+            const out = createSquareCanvas(IMAGE_SIZE);
+
+            out.ctx.drawImage(
+                mid.canvas,
+                0, 0, MID_SIZE, MID_SIZE,
+                0, 0, IMAGE_SIZE, IMAGE_SIZE
             );
 
             console.log(
                 "전처리 이미지 크기:",
-                canvas.width,
-                canvas.height
+                out.canvas.width,
+                out.canvas.height
             );
 
-            return canvas;
+            return out.canvas;
 
         }
 
@@ -529,53 +515,51 @@
                 updateButton();
 
                 result.textContent = "";
-
                 labelContainer.innerHTML = "";
+                debugContainer.innerHTML = "";
 
-                status.textContent =
-                    "AI가 이미지를 분석하고 있습니다...";
+                status.textContent = "AI가 이미지를 분석하고 있습니다...";
 
                 // 이미지 디코딩 완료 확인
                 await preview.decode();
 
-                // 이미지 전처리
-                const canvas =
-                    preprocessImage(preview);
+                // 이미지 전처리 (비트맵이 있으면 비트맵 사용)
+                const source = currentBitmap || preview;
 
-                // 실행 환경 확인
-                console.log(
-                    "현재 Backend:",
-                    tf.getBackend()
-                );
+                const canvas = preprocessImage(source);
+
+                // 디버그: 모델에 들어가는 실제 이미지 표시
+                if (DEBUG_PREPROCESS) {
+
+                    const label = document.createElement("div");
+
+                    label.textContent =
+                        `모델 입력 이미지 (backend: ${tf.getBackend()}, ` +
+                        `tfjs: ${tf.version.tfjs})`;
+
+                    debugContainer.appendChild(label);
+                    debugContainer.appendChild(canvas);
+
+                }
 
                 // Teachable Machine 예측
-                const prediction =
-                    await model.predict(canvas);
+                const prediction = await model.predict(canvas);
 
-                console.log(
-                    "AI 전체 예측 결과:"
-                );
-
+                console.log("AI 전체 예측 결과:");
                 console.table(prediction);
 
                 // =================================
                 // 가장 높은 확률의 클래스 찾기
                 // =================================
 
-                const sortedPrediction =
-                    [...prediction].sort(
-                        (a, b) =>
-                            b.probability - a.probability
-                    );
+                const sortedPrediction = [...prediction].sort(
+                    (a, b) => b.probability - a.probability
+                );
 
-                const bestPrediction =
-                    sortedPrediction[0];
+                const bestPrediction = sortedPrediction[0];
 
-                const animal =
-                    bestPrediction.className;
-
-                const probability =
-                    bestPrediction.probability;
+                const animal = bestPrediction.className;
+                const probability = bestPrediction.probability;
 
                 // =================================
                 // 최종 결과 출력
@@ -589,103 +573,62 @@
                 // 클래스별 확률 출력
                 // =================================
 
-                const heading =
-                    document.createElement("h3");
+                const heading = document.createElement("h3");
 
-                heading.textContent =
-                    "📊 동물상별 인식 결과";
+                heading.textContent = "📊 동물상별 인식 결과";
 
                 labelContainer.appendChild(heading);
 
-                sortedPrediction.forEach(
-                    function(item) {
+                sortedPrediction.forEach(function (item) {
 
-                        const className =
-                            item.className;
+                    const percent = Math.max(
+                        0,
+                        Math.min(100, item.probability * 100)
+                    );
 
-                        const score =
-                            item.probability;
+                    const div = document.createElement("div");
+                    div.className = "result-item";
 
-                        const percent =
-                            Math.max(
-                                0,
-                                Math.min(100, score * 100)
-                            );
+                    const title = document.createElement("div");
+                    title.className = "result-title";
 
-                        const div =
-                            document.createElement("div");
+                    const name = document.createElement("span");
+                    name.textContent = item.className;
 
-                        div.className = "result-item";
+                    const value = document.createElement("strong");
+                    value.textContent = percent.toFixed(1) + "%";
 
-                        const title =
-                            document.createElement("div");
+                    title.appendChild(name);
+                    title.appendChild(value);
 
-                        title.className =
-                            "result-title";
+                    const progress = document.createElement("div");
+                    progress.className = "progress";
 
-                        const name =
-                            document.createElement("span");
+                    const bar = document.createElement("div");
+                    bar.className = "progress-bar";
+                    bar.style.width = percent + "%";
 
-                        name.textContent = className;
+                    progress.appendChild(bar);
 
-                        const value =
-                            document.createElement("strong");
+                    div.appendChild(title);
+                    div.appendChild(progress);
 
-                        value.textContent =
-                            percent.toFixed(1) + "%";
+                    labelContainer.appendChild(div);
 
-                        title.appendChild(name);
-                        title.appendChild(value);
+                });
 
-                        const progress =
-                            document.createElement("div");
+                status.textContent = "분석이 완료되었습니다!";
 
-                        progress.className = "progress";
-
-                        const bar =
-                            document.createElement("div");
-
-                        bar.className = "progress-bar";
-
-                        bar.style.width =
-                            percent + "%";
-
-                        progress.appendChild(bar);
-
-                        div.appendChild(title);
-                        div.appendChild(progress);
-
-                        labelContainer.appendChild(div);
-
-                    }
-                );
-
-                status.textContent =
-                    "분석이 완료되었습니다!";
-
-                console.log(
-                    "최종 동물상:",
-                    animal
-                );
-
-                console.log(
-                    "최종 확률:",
-                    probability * 100
-                );
+                console.log("최종 동물상:", animal);
+                console.log("최종 확률:", probability * 100);
 
             } catch (error) {
 
-                console.error(
-                    "이미지 분석 오류:",
-                    error
-                );
+                console.error("이미지 분석 오류:", error);
 
-                status.textContent =
-                    "이미지 분석에 실패했습니다.";
+                status.textContent = "이미지 분석에 실패했습니다.";
 
-                alert(
-                    "이미지 분석 중 오류가 발생했습니다."
-                );
+                alert("이미지 분석 중 오류가 발생했습니다.");
 
             } finally {
 
@@ -702,10 +645,7 @@
         // 8. 분석 버튼 이벤트
         // =====================================
 
-        analyzeButton.addEventListener(
-            "click",
-            predictImage
-        );
+        analyzeButton.addEventListener("click", predictImage);
 
 
         // =====================================
@@ -713,7 +653,6 @@
         // =====================================
 
         init();
-
 
     </script>
 
