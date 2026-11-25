@@ -17,6 +17,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
 
     <style>
+        /* 색상, 둥근 정도 등 공통 값 (여기서 한 번에 바꿀 수 있음) */
         :root {
             --bg: #e6f4f0;
             --panel: #ffffff;
@@ -30,8 +31,10 @@
             --radius: 24px;
         }
 
+        /* 패딩이 있어도 너비가 넘치지 않게 계산 방식 통일 */
         * { box-sizing: border-box; }
 
+        /* 페이지 전체 배경, 글꼴 */
         body {
             margin: 0;
             min-height: 100vh;
@@ -41,12 +44,14 @@
             line-height: 1.55;
         }
 
+        /* 전체 내용을 가운데 정렬하는 컨테이너 */
         .app {
             max-width: 560px;
             margin: 0 auto;
             padding: 32px 18px 48px;
         }
 
+        /* 제목 영역 */
         header { text-align: center; margin-bottom: 22px; }
 
         h1 {
@@ -62,6 +67,7 @@
             font-size: 15px;
         }
 
+        /* 흰색 카드 (업로드 카드, 결과 카드 공통) */
         .panel {
             background: var(--panel);
             border-radius: var(--radius);
@@ -72,6 +78,7 @@
 
         /* ---------- 업로드 ---------- */
 
+        /* 실제 파일 입력창은 숨기고, 아래 dropzone(label)을 대신 보여줌 */
         #image-upload {
             position: absolute;
             width: 1px;
@@ -79,6 +86,7 @@
             opacity: 0;
         }
 
+        /* 점선 업로드 박스: 클릭 또는 드래그 앤 드롭으로 사진 선택 */
         .dropzone {
             display: block;
             border: 3px dashed var(--line);
@@ -90,6 +98,7 @@
             transition: border-color 0.15s ease, background 0.15s ease;
         }
 
+        /* 마우스를 올리거나 파일을 끌어왔을 때 강조 */
         .dropzone:hover,
         .dropzone.drag { border-color: var(--brand); background: #eaf8f4; }
 
@@ -104,6 +113,7 @@
 
         .dropzone .sub { color: var(--muted); font-size: 14px; }
 
+        /* 업로드한 사진 미리보기 영역 (사진을 올리면 .show가 붙어 나타남) */
         .preview-wrap {
             display: none;
             margin-top: 16px;
@@ -133,6 +143,7 @@
 
         /* ---------- 버튼 / 상태 ---------- */
 
+        /* 분석하기 버튼 */
         button {
             width: 100%;
             margin-top: 16px;
@@ -165,6 +176,7 @@
             outline-offset: 3px;
         }
 
+        /* 상태 메시지 (오류는 .error, 진행 중은 .busy로 표시) */
         #status {
             margin-top: 14px;
             padding: 10px 14px;
@@ -194,31 +206,34 @@
 
         /* ---------- 결과 ---------- */
 
+        /* 결과 카드: 분석이 끝나면 .show가 붙어 나타남 */
         #result-panel { display: none; }
         #result-panel.show { display: block; }
 
+        /* 최종 결과 박스 ("OO상입니다!") */
         #result {
             text-align: center;
-            padding: 22px 12px;
+            padding: 14px 12px;
             border-radius: 18px;
             background: #fff4d1;
         }
 
         #result .emoji {
-            font-size: 72px;
+            font-size: 48px;
             line-height: 1.1;
             animation: pop 0.5s ease-out;
         }
 
         #result .headline {
-            margin-top: 6px;
+            margin-top: 4px;
             font-family: "Jua", sans-serif;
-            font-size: clamp(28px, 7vw, 36px);
+            font-size: clamp(20px, 5vw, 24px);
         }
 
         #result .percent {
             margin-top: 2px;
             color: #7a5b00;
+            font-size: 14px;
             font-weight: 700;
         }
 
@@ -227,6 +242,7 @@
             to   { transform: scale(1); opacity: 1; }
         }
 
+        /* 동물상별 확률 막대 그래프 영역 */
         #label-container { margin-top: 20px; }
 
         #label-container h3 {
@@ -262,6 +278,7 @@
         .result-item.top .progress-bar { background: var(--brand); }
         .result-item.top .result-title { font-weight: 700; }
 
+        /* 디버그용 영역 (DEBUG_PREPROCESS = true일 때만 내용이 생김) */
         #debug-container {
             margin-top: 14px;
             font-size: 12px;
@@ -275,6 +292,7 @@
             border: 1px solid var(--line);
         }
 
+        /* 움직임 줄이기 설정을 켠 사용자는 애니메이션 끔 */
         @media (prefers-reduced-motion: reduce) {
             * { animation: none !important; transition: none !important; }
         }
@@ -284,11 +302,13 @@
 <body>
 <div class="app">
 
+    <!-- 제목과 안내 문구 -->
     <header>
         <h1>🐶 동물상 테스트 🦊</h1>
         <p class="lead">내 사진이나 닮은 연예인 사진을 올리면<br>AI가 어떤 동물상인지 알려드려요.</p>
     </header>
 
+    <!-- 업로드 카드: 사진 선택, 미리보기, 분석 버튼, 상태 메시지 -->
     <section class="panel" aria-label="이미지 업로드">
 
         <!-- 이미지 업로드 -->
@@ -317,6 +337,7 @@
 
     </section>
 
+    <!-- 결과 카드: 분석이 끝난 뒤에만 표시 -->
     <section class="panel" id="result-panel" aria-label="분석 결과" aria-live="polite">
 
         <!-- 최종 결과 -->
@@ -379,6 +400,7 @@
         ["원숭이", "🐵"], ["monkey", "🐵"]
     ];
 
+    // 클래스 이름 -> 이모지 변환 함수
     function emojiFor(className) {
 
         const n = className.toLowerCase();
@@ -408,6 +430,7 @@
     const imageInfo = document.getElementById("image-info");
     const debugContainer = document.getElementById("debug-container");
 
+    // 상태 메시지 표시 (mode: "busy" = 진행 중, "error" = 오류, 없으면 일반)
     function setStatus(text, mode) {
         statusEl.textContent = text;
         statusEl.className = mode || "";
@@ -487,6 +510,7 @@
     // 5. 이미지 업로드
     // =====================================
 
+    // 선택하거나 끌어다 놓은 파일을 검사하고 미리보기를 만드는 함수
     async function handleFile(file) {
 
         if (!file) return;
@@ -598,11 +622,13 @@
 
     }
 
+    // 클릭해서 파일을 고른 경우
     uploadInput.addEventListener("change", function (event) {
         handleFile(event.target.files[0]);
     });
 
-    // 끌어다 놓기
+    // 끌어다 놓기: 파일이 박스 위에 있는 동안 강조 표시
+    // (preventDefault가 없으면 브라우저가 이미지를 새 화면에서 열어버림)
     ["dragenter", "dragover"].forEach(function (type) {
         dropzone.addEventListener(type, function (e) {
             e.preventDefault();
@@ -617,6 +643,7 @@
         });
     });
 
+    // 박스 위에 파일을 놓은 경우 (여러 장이면 첫 번째 파일만 사용)
     dropzone.addEventListener("drop", function (e) {
         handleFile(e.dataTransfer.files[0]);
     });
@@ -763,7 +790,7 @@
             const animal = bestPrediction.className;
             const probability = bestPrediction.probability;
 
-            // 최종 결과 출력 (textContent로 넣어 안전하게 표시)
+            // 최종 결과 출력: 이모지 + 문구 + 일치도 (textContent로 넣어 안전하게 표시)
 
             resultEl.innerHTML = "";
 
@@ -827,7 +854,7 @@
 
                 labelContainer.appendChild(div);
 
-                // 막대가 차오르는 효과
+                // 막대가 0%에서 목표 값까지 차오르는 효과 (프레임 두 번 기다린 뒤 너비 지정)
                 requestAnimationFrame(function () {
                     requestAnimationFrame(function () {
                         bar.style.width = percent + "%";
