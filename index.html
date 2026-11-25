@@ -4,403 +4,331 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>AI 동물상 테스트</title>
+    <title>인물별 동물상 테스트</title>
 
-    <!-- TensorFlow.js -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- TensorFlow.js (버전 고정: PC/모바일 동일 버전 보장) -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
 
-    <!-- Teachable Machine -->
+    <!-- Teachable Machine (버전 고정) -->
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
 
     <style>
-        * {
-            box-sizing: border-box;
+        :root {
+            --bg: #e6f4f0;
+            --panel: #ffffff;
+            --ink: #16312c;
+            --muted: #5f7d76;
+            --line: #cfe6df;
+            --brand: #0f9d8a;
+            --brand-dark: #0a7667;
+            --sun: #ffc83d;
+            --err: #c0304f;
+            --radius: 24px;
         }
+
+        * { box-sizing: border-box; }
 
         body {
             margin: 0;
-            padding: 35px 15px;
-            font-family: Arial, "Malgun Gothic", sans-serif;
-            background: linear-gradient(135deg, #eef0ff, #f9f5ff, #edf5ff);
-            color: #25243a;
             min-height: 100vh;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+            line-height: 1.55;
         }
 
-        .container {
-            max-width: 680px;
+        .app {
+            max-width: 560px;
             margin: 0 auto;
+            padding: 32px 18px 48px;
         }
 
-        /* 상단 제목 */
-        .header {
-            text-align: center;
-            margin-bottom: 28px;
-        }
-
-        .header-icon {
-            font-size: 48px;
-            margin-bottom: 10px;
-        }
+        header { text-align: center; margin-bottom: 22px; }
 
         h1 {
-            font-size: 30px;
-            margin: 0 0 12px;
-            color: #312e81;
-            letter-spacing: -1px;
+            margin: 0 0 6px;
+            font-family: "Jua", "Noto Sans KR", sans-serif;
+            font-weight: 400;
+            font-size: clamp(32px, 8vw, 44px);
         }
 
-        .subtitle {
-            color: #77758c;
+        .lead {
+            margin: 0;
+            color: var(--muted);
             font-size: 15px;
-            line-height: 1.7;
         }
 
-        /* 메인 카드 */
-        .main-card {
-            background: #ffffff;
-            padding: 30px;
-            border-radius: 25px;
-            box-shadow: 0 12px 40px rgba(65, 55, 130, 0.10);
+        .panel {
+            background: var(--panel);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: 0 6px 0 var(--line);
+            margin-bottom: 20px;
         }
 
-        .section-title {
-            font-size: 18px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            color: #35325d;
-        }
-
-        /* 이미지 업로드 */
-        .upload-area {
-            border: 2px dashed #b9b4ee;
-            background: #f8f7ff;
-            border-radius: 18px;
-            padding: 27px 15px;
-            text-align: center;
-            cursor: pointer;
-            transition: 0.25s;
-        }
-
-        .upload-area:hover {
-            background: #f0efff;
-            border-color: #7667dc;
-        }
-
-        .upload-icon {
-            font-size: 38px;
-            margin-bottom: 10px;
-        }
-
-        .upload-main {
-            color: #5145b8;
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 7px;
-        }
-
-        .upload-sub {
-            color: #9995ae;
-            font-size: 13px;
-        }
+        /* ---------- 업로드 ---------- */
 
         #image-upload {
-            display: none;
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
         }
 
-        /* 이미지 미리보기 */
-        .preview-wrapper {
+        .dropzone {
+            display: block;
+            border: 3px dashed var(--line);
+            border-radius: 18px;
+            padding: 22px 16px;
             text-align: center;
-            margin-top: 20px;
+            cursor: pointer;
+            background: #f5fbf9;
+            transition: border-color 0.15s ease, background 0.15s ease;
         }
+
+        .dropzone:hover,
+        .dropzone.drag { border-color: var(--brand); background: #eaf8f4; }
+
+        #image-upload:focus-visible + .dropzone {
+            outline: 3px solid var(--sun);
+            outline-offset: 3px;
+        }
+
+        .dropzone .icon { font-size: 40px; line-height: 1.2; }
+
+        .dropzone .main { font-weight: 700; font-size: 17px; }
+
+        .dropzone .sub { color: var(--muted); font-size: 14px; }
+
+        .preview-wrap {
+            display: none;
+            margin-top: 16px;
+            text-align: center;
+        }
+
+        .preview-wrap.show { display: block; }
 
         #preview {
             display: none;
             max-width: 100%;
-            max-height: 350px;
-            border-radius: 16px;
+            max-height: 320px;
+            width: auto;
+            height: auto;
+            margin: 0 auto;
+            border-radius: 18px;
             object-fit: contain;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.10);
+            border: 4px solid var(--line);
+            background: #f5fbf9;
         }
 
         #image-info {
-            color: #999;
-            font-size: 12px;
-            margin-top: 9px;
-        }
-
-        /* 분석 버튼 */
-        .analyze-button {
-            width: 100%;
-            padding: 17px;
-            margin-top: 25px;
-            border: none;
-            border-radius: 14px;
-            background: linear-gradient(110deg, #6558dc, #8a55d8);
-            color: white;
-            font-size: 17px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 6px 15px rgba(105, 85, 210, 0.25);
-            transition: 0.2s;
-        }
-
-        .analyze-button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 9px 20px rgba(105, 85, 210, 0.35);
-        }
-
-        .analyze-button:disabled {
-            background: #c9c6d9;
-            box-shadow: none;
-            cursor: not-allowed;
-        }
-
-        /* 모델 상태 */
-        .status-box {
-            margin-top: 20px;
-            padding: 13px;
-            border-radius: 12px;
-            background: #f5f5fa;
-            text-align: center;
-            color: #77748b;
+            margin-top: 8px;
+            color: var(--muted);
             font-size: 13px;
         }
 
-        /* 결과 영역 */
-        #result-section {
-            display: none;
-            margin-top: 30px;
-            animation: fadeIn 0.5s ease;
+        /* ---------- 버튼 / 상태 ---------- */
+
+        button {
+            width: 100%;
+            margin-top: 16px;
+            padding: 15px 20px;
+            font-family: inherit;
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            background: var(--brand);
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 5px 0 var(--brand-dark);
+            cursor: pointer;
+            transition: transform 0.08s ease, box-shadow 0.08s ease;
         }
 
-        .result-card {
-            background: linear-gradient(135deg, #f0edff, #f7f0ff);
-            border: 1px solid #e4defc;
-            border-radius: 20px;
-            padding: 25px 15px;
+        button:active:not(:disabled) {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 var(--brand-dark);
+        }
+
+        button:disabled {
+            background: #a9c4be;
+            box-shadow: 0 5px 0 #8eaca5;
+            cursor: not-allowed;
+        }
+
+        button:focus-visible {
+            outline: 3px solid var(--sun);
+            outline-offset: 3px;
+        }
+
+        #status {
+            margin-top: 14px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            background: #eef7f4;
+            color: var(--ink);
+            font-size: 14px;
             text-align: center;
         }
 
-        .result-label {
-            color: #8178b7;
-            font-size: 14px;
-            font-weight: bold;
-            margin-bottom: 12px;
-        }
+        #status.error { background: #ffe3e8; color: var(--err); }
 
-        .result-animal {
-            font-size: 32px;
-            font-weight: bold;
-            color: #5143ba;
-            margin-bottom: 12px;
-        }
-
-        .result-percent {
+        #status.busy::before {
+            content: "";
             display: inline-block;
-            background: white;
-            color: #775bd0;
-            padding: 8px 18px;
-            border-radius: 30px;
-            font-size: 18px;
-            font-weight: bold;
+            width: 12px;
+            height: 12px;
+            margin-right: 8px;
+            border: 3px solid var(--line);
+            border-top-color: var(--brand);
+            border-radius: 50%;
+            vertical-align: -1px;
+            animation: spin 0.8s linear infinite;
         }
 
-        /* 확률 그래프 */
-        .probability-section {
-            margin-top: 28px;
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ---------- 결과 ---------- */
+
+        #result-panel { display: none; }
+        #result-panel.show { display: block; }
+
+        #result {
+            text-align: center;
+            padding: 22px 12px;
+            border-radius: 18px;
+            background: #fff4d1;
         }
 
-        .probability-title {
-            font-size: 17px;
-            font-weight: bold;
-            color: #35325d;
-            margin-bottom: 18px;
+        #result .emoji {
+            font-size: 72px;
+            line-height: 1.1;
+            animation: pop 0.5s ease-out;
         }
 
-        .result-item {
-            margin-bottom: 20px;
+        #result .headline {
+            margin-top: 6px;
+            font-family: "Jua", sans-serif;
+            font-size: clamp(28px, 7vw, 36px);
         }
+
+        #result .percent {
+            margin-top: 2px;
+            color: #7a5b00;
+            font-weight: 700;
+        }
+
+        @keyframes pop {
+            from { transform: scale(0.4); opacity: 0; }
+            to   { transform: scale(1); opacity: 1; }
+        }
+
+        #label-container { margin-top: 20px; }
+
+        #label-container h3 {
+            margin: 0 0 12px;
+            font-size: 15px;
+            color: var(--muted);
+        }
+
+        .result-item { margin: 14px 0; }
 
         .result-title {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-            font-size: 14px;
-            color: #55516e;
-        }
-
-        .result-title strong {
-            color: #6558c9;
+            margin-bottom: 5px;
+            font-size: 15px;
         }
 
         .progress {
             width: 100%;
-            height: 13px;
-            background: #eeedf5;
-            border-radius: 20px;
+            height: 14px;
+            background: #e9f2ef;
+            border-radius: 99px;
             overflow: hidden;
         }
 
         .progress-bar {
-            width: 0;
             height: 100%;
-            background: linear-gradient(90deg, #7565e5, #b16cdb);
-            border-radius: 20px;
-            transition: width 1s ease;
+            background: #9bc7bd;
+            border-radius: 99px;
+            transition: width 0.6s ease;
         }
 
-        /* 하단 안내 */
-        .notice {
-            text-align: center;
-            color: #9995aa;
-            font-size: 12px;
-            line-height: 1.7;
-            margin-top: 23px;
-        }
+        .result-item.top .progress-bar { background: var(--brand); }
+        .result-item.top .result-title { font-weight: 700; }
 
-        /* 디버그 영역 */
         #debug-container {
-            margin-top: 20px;
-            text-align: center;
+            margin-top: 14px;
             font-size: 12px;
-            color: #888;
+            color: var(--muted);
+            text-align: center;
         }
 
         #debug-container canvas {
-            max-width: 100%;
-            margin-top: 10px;
-            border-radius: 8px;
+            display: block;
+            margin: 8px auto;
+            border: 1px solid var(--line);
         }
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(12px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* 모바일 화면 */
-        @media (max-width: 600px) {
-            body {
-                padding: 20px 12px;
-            }
-
-            .main-card {
-                padding: 22px 17px;
-                border-radius: 20px;
-            }
-
-            h1 {
-                font-size: 25px;
-            }
-
-            .header-icon {
-                font-size: 42px;
-            }
-
-            .result-animal {
-                font-size: 27px;
-            }
-
-            .upload-area {
-                padding: 24px 10px;
-            }
+        @media (prefers-reduced-motion: reduce) {
+            * { animation: none !important; transition: none !important; }
         }
     </style>
 </head>
 
 <body>
+<div class="app">
 
-<div class="container">
-
-    <!-- 상단 제목 -->
-    <header class="header">
-        <div class="header-icon">🐶 🦊 🐱</div>
-        <h1>AI 동물상 테스트</h1>
-        <div class="subtitle">
-            인공지능이 사진을 분석하여<br>
-            나와 닮은 동물상을 찾아드립니다!
-        </div>
+    <header>
+        <h1>🐶 동물상 테스트 🦊</h1>
+        <p class="lead">내 사진이나 닮은 연예인 사진을 올리면<br>AI가 어떤 동물상인지 알려드려요.</p>
     </header>
 
-    <main class="main-card">
+    <section class="panel" aria-label="이미지 업로드">
 
         <!-- 이미지 업로드 -->
-        <div class="section-title">
-            📷 나의 사진 업로드
-        </div>
-
-        <label class="upload-area" for="image-upload">
-            <div class="upload-icon">🖼️</div>
-            <div class="upload-main">사진을 선택해 주세요</div>
-            <div class="upload-sub">
-                JPG, PNG 이미지 파일 지원
-            </div>
+        <input type="file" id="image-upload" accept="image/*">
+        <label class="dropzone" id="dropzone" for="image-upload">
+            <div class="icon">📷</div>
+            <div class="main">사진 선택하기</div>
+            <div class="sub">클릭하거나 사진을 끌어다 놓으세요 (JPG, PNG)</div>
         </label>
 
-        <input type="file"
-               id="image-upload"
-               accept="image/*">
-
         <!-- 이미지 미리보기 -->
-        <div class="preview-wrapper">
+        <div class="preview-wrap" id="preview-wrap">
             <img id="preview" alt="업로드 이미지 미리보기">
             <div id="image-info"></div>
         </div>
 
         <!-- 분석 버튼 -->
-        <button type="button"
-                class="analyze-button"
-                id="analyze-button"
-                disabled>
-            ✨ AI 동물상 분석하기
+        <button type="button" id="analyze-button" disabled>
+            동물상 분석하기
         </button>
 
         <!-- 모델 상태 -->
-        <div class="status-box" id="status">
-            ⏳ AI 모델을 불러오는 중입니다...
+        <div id="status" role="status" aria-live="polite">
+            AI 모델을 불러오는 중입니다...
         </div>
 
-        <!-- 분석 결과 -->
-        <section id="result-section">
+    </section>
 
-            <div class="result-card">
-                <div class="result-label">
-                    🎉 AI 분석 결과
-                </div>
+    <section class="panel" id="result-panel" aria-label="분석 결과" aria-live="polite">
 
-                <div class="result-animal" id="result-animal">
-                </div>
+        <!-- 최종 결과 -->
+        <div id="result"></div>
 
-                <div class="result-percent" id="result-percent">
-                </div>
-            </div>
+        <!-- 클래스별 확률 -->
+        <div id="label-container"></div>
 
-            <!-- 클래스별 확률 -->
-            <div class="probability-section">
-                <div class="probability-title">
-                    📊 동물상별 인식 확률
-                </div>
-
-                <div id="label-container"></div>
-            </div>
-
-        </section>
-
-        <!-- 디버그 영역 -->
+        <!-- 디버그: 모델에 실제로 들어간 224x224 이미지 (DEBUG_PREPROCESS = true 일 때만 표시) -->
         <div id="debug-container"></div>
 
-    </main>
-
-    <footer class="notice">
-        AI 분석 결과는 학습 데이터와 이미지에 따라 달라질 수 있습니다.<br>
-        재미와 체험을 위한 인공지능 테스트입니다.
-    </footer>
+    </section>
 
 </div>
 
@@ -413,18 +341,55 @@
 
     const MODEL_URL = "./my_model/";
 
+    // Teachable Machine 기본 이미지 입력 크기
     const IMAGE_SIZE = 224;
+
+    // 전처리 중간 단계 해상도 (기기와 상관없이 고정)
     const MID_SIZE = 512;
 
+    // true로 바꾸면 모델에 들어간 224x224 이미지와 백엔드 정보를 화면에 표시
     const DEBUG_PREPROCESS = false;
 
     let model = null;
+
     let modelReady = false;
     let imageReady = false;
     let isAnalyzing = false;
 
     let currentObjectURL = null;
+
+    // EXIF 회전이 적용된 이미지 비트맵 (분석에 사용)
     let currentBitmap = null;
+
+    // 클래스 이름에 포함된 단어로 이모지를 고름 (없으면 🐾)
+    const animalEmoji = [
+        ["강아지", "🐶"], ["개", "🐶"], ["dog", "🐶"],
+        ["고양이", "🐱"], ["cat", "🐱"],
+        ["여우", "🦊"], ["fox", "🦊"],
+        ["토끼", "🐰"], ["rabbit", "🐰"],
+        ["곰", "🐻"], ["bear", "🐻"],
+        ["사슴", "🦌"], ["deer", "🦌"],
+        ["공룡", "🦖"], ["dinosaur", "🦖"],
+        ["늑대", "🐺"], ["wolf", "🐺"],
+        ["햄스터", "🐹"], ["hamster", "🐹"],
+        ["펭귄", "🐧"], ["penguin", "🐧"],
+        ["오리", "🦆"], ["duck", "🦆"],
+        ["말", "🐴"], ["horse", "🐴"],
+        ["호랑이", "🐯"], ["tiger", "🐯"],
+        ["원숭이", "🐵"], ["monkey", "🐵"]
+    ];
+
+    function emojiFor(className) {
+
+        const n = className.toLowerCase();
+
+        for (const pair of animalEmoji) {
+            if (n.includes(pair[0])) return pair[1];
+        }
+
+        return "🐾";
+
+    }
 
 
     // =====================================
@@ -432,17 +397,21 @@
     // =====================================
 
     const uploadInput = document.getElementById("image-upload");
+    const dropzone = document.getElementById("dropzone");
     const preview = document.getElementById("preview");
+    const previewWrap = document.getElementById("preview-wrap");
     const analyzeButton = document.getElementById("analyze-button");
-    const status = document.getElementById("status");
-    const imageInfo = document.getElementById("image-info");
-
-    const resultSection = document.getElementById("result-section");
-    const resultAnimal = document.getElementById("result-animal");
-    const resultPercent = document.getElementById("result-percent");
-
+    const statusEl = document.getElementById("status");
+    const resultPanel = document.getElementById("result-panel");
+    const resultEl = document.getElementById("result");
     const labelContainer = document.getElementById("label-container");
+    const imageInfo = document.getElementById("image-info");
     const debugContainer = document.getElementById("debug-container");
+
+    function setStatus(text, mode) {
+        statusEl.textContent = text;
+        statusEl.className = mode || "";
+    }
 
 
     // =====================================
@@ -452,7 +421,9 @@
     function updateButton() {
 
         analyzeButton.disabled =
-            !modelReady || !imageReady || isAnalyzing;
+            !modelReady ||
+            !imageReady ||
+            isAnalyzing;
 
     }
 
@@ -465,29 +436,37 @@
 
         try {
 
-            status.textContent = "⏳ TensorFlow.js 초기화 중...";
+            setStatus("TensorFlow.js 초기화 중...", "busy");
 
             // PC와 모바일의 연산 백엔드 통일
             await tf.setBackend("cpu");
+
+            // TensorFlow 초기화 완료 대기
             await tf.ready();
 
-            console.log("Backend:", tf.getBackend());
-            console.log("TensorFlow.js:", tf.version.tfjs);
+            console.log("TensorFlow Backend:", tf.getBackend());
+            console.log("TensorFlow Version:", tf.version.tfjs);
 
-            status.textContent = "⏳ AI 모델을 불러오는 중입니다...";
+            setStatus("AI 모델을 불러오는 중입니다...", "busy");
 
             const modelURL = MODEL_URL + "model.json";
             const metadataURL = MODEL_URL + "metadata.json";
 
+            // Teachable Machine 모델 로딩
             model = await tmImage.load(modelURL, metadataURL);
 
             modelReady = true;
 
             console.log("모델 로딩 완료");
-            console.log("클래스:", model.getClassLabels());
+            console.log("클래스 목록:", model.getClassLabels());
 
-            status.textContent =
-                "✅ AI 모델 준비 완료! 사진을 업로드해 주세요.";
+            let message = "모델 로딩 완료! 사진을 올려주세요.";
+
+            if (DEBUG_PREPROCESS) {
+                message += ` (backend: ${tf.getBackend()}, tfjs: ${tf.version.tfjs})`;
+            }
+
+            setStatus(message);
 
             updateButton();
 
@@ -495,10 +474,9 @@
 
             console.error("모델 로딩 오류:", error);
 
-            status.textContent =
-                "❌ 모델 로딩에 실패했습니다. 모델 폴더를 확인하세요.";
+            setStatus("모델 로딩에 실패했습니다. my_model 폴더를 확인하세요.", "error");
 
-            alert("AI 모델을 불러오지 못했습니다.");
+            alert("AI 모델을 불러오지 못했습니다. 모델 폴더를 확인하세요.");
 
         }
 
@@ -509,12 +487,11 @@
     // 5. 이미지 업로드
     // =====================================
 
-    uploadInput.addEventListener("change", async function(event) {
-
-        const file = event.target.files[0];
+    async function handleFile(file) {
 
         if (!file) return;
 
+        // 이미지 파일 확인
         if (!file.type.startsWith("image/")) {
 
             alert("이미지 파일만 업로드할 수 있습니다.");
@@ -525,44 +502,44 @@
 
         }
 
-        // 기존 분석 결과 초기화
-        resultSection.style.display = "none";
-        resultAnimal.textContent = "";
-        resultPercent.textContent = "";
+        // 이전 결과 초기화
+        resultEl.innerHTML = "";
         labelContainer.innerHTML = "";
         debugContainer.innerHTML = "";
         imageInfo.textContent = "";
+        resultPanel.classList.remove("show");
 
         imageReady = false;
+
         updateButton();
 
         try {
 
-            // 이전 임시 URL 해제
+            // 이전 임시 URL / 비트맵 해제
             if (currentObjectURL) {
                 URL.revokeObjectURL(currentObjectURL);
             }
 
-            // 이전 비트맵 해제
             if (currentBitmap && currentBitmap.close) {
                 currentBitmap.close();
             }
 
             currentBitmap = null;
 
-            // 새로운 이미지 URL 생성
+            // 새로운 이미지 URL 생성 (미리보기용)
             currentObjectURL = URL.createObjectURL(file);
 
             preview.src = currentObjectURL;
             preview.style.display = "block";
+            previewWrap.classList.add("show");
 
-            // 이미지 로딩 완료 대기
+            // 이미지 디코딩 완료 대기
             await preview.decode();
 
+            // EXIF 회전을 일관되게 적용한 비트맵 생성
             let width = preview.naturalWidth;
             let height = preview.naturalHeight;
 
-            // EXIF 회전 적용
             if (window.createImageBitmap) {
 
                 try {
@@ -574,27 +551,34 @@
                     width = currentBitmap.width;
                     height = currentBitmap.height;
 
-                } catch (error) {
+                } catch (bitmapError) {
 
-                    console.warn("비트맵 생성 실패:", error);
+                    console.warn(
+                        "createImageBitmap 실패, <img>로 대체:",
+                        bitmapError
+                    );
+
+                    currentBitmap = null;
 
                 }
 
             }
 
             if (width === 0 || height === 0) {
+
                 throw new Error("이미지 크기를 확인할 수 없습니다.");
+
             }
 
             imageReady = true;
 
-            imageInfo.textContent =
-                `원본 이미지 크기: ${width} × ${height}`;
+            imageInfo.textContent = `${file.name} · ${width} × ${height}`;
 
-            status.textContent =
-                "✅ 이미지 업로드 완료! 분석할 수 있습니다.";
+            setStatus("사진을 불러왔어요! 분석할 수 있습니다.");
 
-            console.log("이미지 크기:", width, height);
+            console.log("업로드 파일:", file.name);
+            console.log("파일 크기:", file.size, "bytes");
+            console.log("이미지 실제 크기:", width, height);
 
             updateButton();
 
@@ -602,21 +586,44 @@
 
             console.error("이미지 업로드 오류:", error);
 
-            status.textContent =
-                "❌ 이미지를 불러오지 못했습니다.";
+            setStatus("이미지를 불러오지 못했습니다. JPG 또는 PNG 파일을 사용해 주세요.", "error");
 
             alert("이미지를 읽을 수 없습니다. JPG 또는 PNG 파일을 사용해 주세요.");
 
             imageReady = false;
+
             updateButton();
 
         }
 
+    }
+
+    uploadInput.addEventListener("change", function (event) {
+        handleFile(event.target.files[0]);
+    });
+
+    // 끌어다 놓기
+    ["dragenter", "dragover"].forEach(function (type) {
+        dropzone.addEventListener(type, function (e) {
+            e.preventDefault();
+            dropzone.classList.add("drag");
+        });
+    });
+
+    ["dragleave", "drop"].forEach(function (type) {
+        dropzone.addEventListener(type, function (e) {
+            e.preventDefault();
+            dropzone.classList.remove("drag");
+        });
+    });
+
+    dropzone.addEventListener("drop", function (e) {
+        handleFile(e.dataTransfer.files[0]);
     });
 
 
     // =====================================
-    // 6. 이미지 전처리
+    // 6. 이미지 전처리 (기기 간 결과 차이 최소화)
     // =====================================
 
     function createSquareCanvas(sizePx) {
@@ -632,7 +639,7 @@
             throw new Error("Canvas를 생성할 수 없습니다.");
         }
 
-        // 투명 배경은 흰색으로 처리
+        // 투명 PNG가 검은 배경으로 처리되지 않도록 흰색으로 먼저 채움
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, sizePx, sizePx);
 
@@ -643,19 +650,19 @@
 
     }
 
-
     function preprocessImage(source) {
 
+        // source: ImageBitmap 또는 HTMLImageElement
         const width = source.naturalWidth || source.width;
         const height = source.naturalHeight || source.height;
 
-        // 중앙 정사각형 영역 계산
+        // 중앙 크롭을 위한 정사각형 영역 계산
         const size = Math.min(width, height);
 
         const sx = (width - size) / 2;
         const sy = (height - size) / 2;
 
-        // 1단계: 원본 이미지 → 512 × 512
+        // 1단계: 중앙 정사각형을 고정 해상도(512x512)로 변환
         const mid = createSquareCanvas(MID_SIZE);
 
         mid.ctx.drawImage(
@@ -664,7 +671,7 @@
             0, 0, MID_SIZE, MID_SIZE
         );
 
-        // 2단계: 512 × 512 → 224 × 224
+        // 2단계: 512 -> 224
         const out = createSquareCanvas(IMAGE_SIZE);
 
         out.ctx.drawImage(
@@ -673,11 +680,7 @@
             0, 0, IMAGE_SIZE, IMAGE_SIZE
         );
 
-        console.log(
-            "전처리 이미지:",
-            out.canvas.width,
-            out.canvas.height
-        );
+        console.log("전처리 이미지 크기:", out.canvas.width, out.canvas.height);
 
         return out.canvas;
 
@@ -714,28 +717,29 @@
 
             updateButton();
 
-            resultSection.style.display = "none";
+            resultEl.innerHTML = "";
             labelContainer.innerHTML = "";
             debugContainer.innerHTML = "";
+            resultPanel.classList.remove("show");
 
-            status.textContent =
-                "🔍 AI가 이미지를 분석하고 있습니다...";
+            setStatus("AI가 이미지를 분석하고 있습니다...", "busy");
 
+            // 이미지 디코딩 완료 확인
             await preview.decode();
 
-            // 비트맵이 있으면 비트맵 사용
+            // 이미지 전처리 (비트맵이 있으면 비트맵 사용)
             const source = currentBitmap || preview;
 
-            // 이미지 전처리
             const canvas = preprocessImage(source);
 
-            // 디버그 이미지 표시
+            // 디버그: 모델에 들어가는 실제 이미지 표시
             if (DEBUG_PREPROCESS) {
 
                 const label = document.createElement("div");
 
                 label.textContent =
-                    `모델 입력 이미지 (${tf.getBackend()})`;
+                    `모델 입력 이미지 (backend: ${tf.getBackend()}, ` +
+                    `tfjs: ${tf.version.tfjs})`;
 
                 debugContainer.appendChild(label);
                 debugContainer.appendChild(canvas);
@@ -745,10 +749,11 @@
             // Teachable Machine 예측
             const prediction = await model.predict(canvas);
 
-            console.log("AI 예측 결과:");
+            console.log("AI 전체 예측 결과:");
             console.table(prediction);
 
-            // 높은 확률순 정렬
+            // 가장 높은 확률의 클래스 찾기
+
             const sortedPrediction = [...prediction].sort(
                 (a, b) => b.probability - a.probability
             );
@@ -758,21 +763,35 @@
             const animal = bestPrediction.className;
             const probability = bestPrediction.probability;
 
-            // =================================
-            // 최종 결과 출력
-            // =================================
+            // 최종 결과 출력 (textContent로 넣어 안전하게 표시)
 
-            resultAnimal.textContent =
-                `🐾 ${animal}상`;
+            resultEl.innerHTML = "";
 
-            resultPercent.textContent =
-                `${(probability * 100).toFixed(1)}%`;
+            const emoji = document.createElement("div");
+            emoji.className = "emoji";
+            emoji.textContent = emojiFor(animal);
 
-            // =================================
+            const headline = document.createElement("div");
+            headline.className = "headline";
+            headline.textContent = `당신은 "${animal}"상입니다!`;
+
+            const percentText = document.createElement("div");
+            percentText.className = "percent";
+            percentText.textContent = `일치도 ${(probability * 100).toFixed(1)}%`;
+
+            resultEl.appendChild(emoji);
+            resultEl.appendChild(headline);
+            resultEl.appendChild(percentText);
+
             // 클래스별 확률 출력
-            // =================================
 
-            sortedPrediction.forEach(function(item) {
+            const heading = document.createElement("h3");
+
+            heading.textContent = "동물상별 인식 결과";
+
+            labelContainer.appendChild(heading);
+
+            sortedPrediction.forEach(function (item, index) {
 
                 const percent = Math.max(
                     0,
@@ -780,15 +799,15 @@
                 );
 
                 const div = document.createElement("div");
-                div.className = "result-item";
+                div.className = "result-item" + (index === 0 ? " top" : "");
 
                 const title = document.createElement("div");
                 title.className = "result-title";
 
                 const name = document.createElement("span");
-                name.textContent = item.className;
+                name.textContent = emojiFor(item.className) + " " + item.className;
 
-                const value = document.createElement("strong");
+                const value = document.createElement("span");
                 value.textContent = percent.toFixed(1) + "%";
 
                 title.appendChild(name);
@@ -799,7 +818,6 @@
 
                 const bar = document.createElement("div");
                 bar.className = "progress-bar";
-
                 bar.style.width = "0%";
 
                 progress.appendChild(bar);
@@ -809,18 +827,20 @@
 
                 labelContainer.appendChild(div);
 
-                // 막대그래프 애니메이션
-                requestAnimationFrame(function() {
-                    bar.style.width = percent + "%";
+                // 막대가 차오르는 효과
+                requestAnimationFrame(function () {
+                    requestAnimationFrame(function () {
+                        bar.style.width = percent + "%";
+                    });
                 });
 
             });
 
-            // 결과 영역 표시
-            resultSection.style.display = "block";
+            resultPanel.classList.add("show");
 
-            status.textContent =
-                "✅ 분석이 완료되었습니다!";
+            resultPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+            setStatus("분석이 완료되었습니다!");
 
             console.log("최종 동물상:", animal);
             console.log("최종 확률:", probability * 100);
@@ -829,8 +849,7 @@
 
             console.error("이미지 분석 오류:", error);
 
-            status.textContent =
-                "❌ 이미지 분석에 실패했습니다.";
+            setStatus("이미지 분석에 실패했습니다.", "error");
 
             alert("이미지 분석 중 오류가 발생했습니다.");
 
