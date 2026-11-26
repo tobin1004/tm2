@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이미지 크롤링 다운로더</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #eef1f4;
+    --panel: #ffffff;
+    --ink: #1b2430;
+    --muted: #5d6b7a;
+    --line: #d5dce3;
+    --accent: #2f5bea;
+    --accent-ink: #ffffff;
+    --err: #c0392b;
+    --log-bg: #17202b;
+    --log-ink: #cfe3d4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12171d;
+      --panel: #1b222b;
+      --ink: #e6ebf0;
+      --muted: #8d9aa8;
+      --line: #2e3844;
+      --accent: #6d8dff;
+      --accent-ink: #0c1220;
+      --err: #ff7a6b;
+      --log-bg: #0c1117;
+      --log-ink: #b9d6c1;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: 1.9rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); margin: 0 0 28px; max-width: 62ch; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 22px;
+  }
+  label { display: block; font-weight: 500; font-size: .92rem; margin-bottom: 6px; }
+  .hint { color: var(--muted); font-size: .82rem; margin-top: 4px; }
+  textarea, input[type="number"], input[type="text"], select {
+    width: 100%;
+    font: inherit;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 9px 11px;
+  }
+  textarea { min-height: 84px; resize: vertical; }
+  textarea:focus, input:focus, select:focus, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-top: 16px; }
+  .check { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 400; }
+  .check input { width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; align-items: center; }
+  button {
+    font: inherit; font-weight: 500;
+    border-radius: 6px; padding: 10px 18px; cursor: pointer;
+    border: 1px solid var(--accent);
+    background: var(--accent); color: var(--accent-ink);
+  }
+  button.secondary { background: transparent; color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+
+  .status { margin-top: 22px; }
+  .bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .status-text { font-size: .88rem; color: var(--muted); margin-top: 6px; min-height: 1.4em; }
+
+  .log {
+    margin-top: 16px;
+    background: var(--log-bg); color: var(--log-ink);
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: .8rem; line-height: 1.5;
+    border-radius: 8px; padding: 12px 14px;
+    max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  .log .e { color: #ff9b8f; }
+
+  .results { margin-top: 32px; display: grid; gap: 28px; }
+  .group h2 { font-size: 1.1rem; margin: 0 0 4px; }
+  .group .count { color: var(--muted); font-size: .85rem; margin-bottom: 10px; }
+  .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  .thumbs a {
+    display: block; aspect-ratio: 1; overflow: hidden;
+    border: 1px solid var(--line); border-radius: 6px; background: var(--panel);
+  }
+  .thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .empty { color: var(--err); font-size: .9rem; }
+  .note { margin-top: 28px; font-size: .82rem; color: var(--muted); max-width: 70ch; }
+  @media (prefers-reduced-motion: reduce) { .bar > span { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>이미지 크롤링 다운로더</h1>
+  <p class="sub">키워드로 이미지를 검색하고, 같은 사진이 겹치지 않게 걸러낸 뒤 ZIP으로 내려받습니다.</p>
+
+  <div class="panel">
+    <label for="keywords">검색 키워드 (쉼표로 구분)</label>
+    <textarea id="keywords">Dog, Fox, Rabbit, 박보영, 한지민, 박보검, 송중기, 이주빈, 전종서, 이준기, 서인국, 박은빈, 장원영, 임시완, 최우식</textarea>
+
+    <div class="grid">
+      <div>
+        <label for="limit">키워드당 최대 개수</label>
+        <input id="limit" type="number" min="1" max="50" value="20">
+        <div class="hint">1 ~ 50</div>
+      </div>
+      <div>
+        <label for="format">이미지 파일 형식</label>
+        <select id="format">
+          <option value="jpg" selected>jpg</option>
+          <option value="png">png</option>
+          <option value="all">전체</option>
+        </select>
+      </div>
+      <div>
+        <label for="outdir">저장 폴더 이름</label>
+        <input id="outdir" type="text" value="T_data">
+        <div class="hint">ZIP 안의 최상위 폴더</div>
+      </div>
+      <div>
+        <label>옵션</label>
+        <label class="check"><input id="printUrls" type="checkbox"> 로그에 URL 표시</label>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="startBtn" type="button">검색 시작</button>
+      <button id="stopBtn" type="button" class="secondary" disabled>중지</button>
+      <button id="zipBtn" type="button" class="secondary" disabled>ZIP으로 다운로드</button>
+    </div>
+
+    <div class="status" aria-live="polite">
+      <div class="bar"><span id="barFill"></span></div>
+      <div class="status-text" id="statusText">키워드를 확인하고 검색을 시작하세요.</div>
+    </div>
+    <div class="log" id="log" hidden></div>
+  </div>
+
+  <div class="results" id="results"></div>
+
+  <p class="note">
+    이미지는 Wikimedia Commons에서 검색합니다. 브라우저 보안 정책(CORS) 때문에 웹페이지에서 구글 이미지 검색 결과를 직접 가져올 수 없어서
+    CORS를 허용하는 공개 API로 대체했습니다. 인물 이름은 결과가 적거나 없을 수 있습니다. 각 이미지는 고유한 라이선스가 있으니 사용 전에 확인하세요.
+  </p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const startBtn = $("startBtn"), stopBtn = $("stopBtn"), zipBtn = $("zipBtn");
+  const barFill = $("barFill"), statusText = $("statusText");
+  const logEl = $("log"), resultsEl = $("results");
+
+  const HASH_DISTANCE = 6;   // 이 값 이하이면 같은 사진으로 판단
+  const BATCH = 4;           // 동시에 내려받을 이미지 수
+  const MAX_PAGES = 3;       // 키워드당 검색 결과 최대 페이지 (50개씩)
+
+  let collected = [];        // [{ keyword, items: [{ blob, url, ext, objUrl }] }]
+  let busy = false;
+  let cancelled = false;
+
+  // ---------- 공통 유틸 ----------
+  function log(msg, isError) {
+    logEl.hidden = false;
+    const line = document.createElement("div");
+    if (isError) line.className = "e";
+    line.textContent = msg;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function setProgress(done, total, text) {
+    barFill.style.width = total ? Math.min(100, Math.round((done / total) * 100)) + "%" : "0";
+    if (text) statusText.textContent = text;
+  }
+
+  function parseList(raw) {
+    return raw.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+
+  function safeName(s) {
+    return s.replace(/[\\/:*?"<>|]/g, "_").trim() || "untitled";
+  }
+
+  // ---------- 검색 ----------
+  async function searchCandidates(keyword, format, poolSize) {
+    const wanted = format === "jpg" ? ["image/jpeg"]
+                 : format === "png" ? ["image/png"]
+                 : ["image/jpeg", "image/png", "image/webp"];
+    const seenTitles = new Set();
+    const out = [];
+    let offset = 0;
+
+    for (let page = 0; page < MAX_PAGES && out.length < poolSize; page++) {
+      const params = new URLSearchParams({
+        action: "query", format: "json", origin: "*",
+        generator: "search",
+        gsrsearch: keyword + " filetype:bitmap",
+        gsrnamespace: "6",
+        gsrlimit: "50",
+        gsroffset: String(offset),
+        prop: "imageinfo",
+        iiprop: "url|mime|size",
+        iiurlwidth: "800"
+      });
+      const res = await fetch("https://commons.wikimedia.org/w/api.php?" + params.toString());
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      const pages = data.query && data.query.pages ? Object.values(data.query.pages) : [];
+      pages.sort((a, b) => (a.index || 0) - (b.index || 0));
+
+      for (const p of pages) {
+        const info = p.imageinfo && p.imageinfo[0];
+        if (!info || !wanted.includes(info.mime)) continue;
+        if (seenTitles.has(p.title)) continue;           // 같은 파일 제목 중복 제거
+        seenTitles.add(p.title);
+        out.push({
+          title: p.title,
+          url: info.thumburl || info.url,
+          ext: info.mime === "image/jpeg" ? "jpg" : info.mime.split("/")[1]
+        });
+      }
+      if (data.continue && data.continue.gsroffset != null) offset = data.continue.gsroffset;
+      else break;
+    }
+    return out;
+  }
+
+  // ---------- 이미지 내려받기 + 중복 판별 ----------
+  function loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("이미지 디코딩 실패"));
+      img.src = src;
+    });
+  }
+
+  // 9x8 그레이스케일 차이 해시(dHash): 크기·압축이 달라도 같은 사진이면 거의 같은 값이 나옴
+  function dHash(img) {
+    const c = document.createElement("canvas");
+    c.width = 9; c.height = 8;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, 9, 8);
+    const d = ctx.getImageData(0, 0, 9, 8).data;
+    const g = [];
+    for (let i = 0; i < d.length; i += 4) g.push(d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114);
+    let bits = "";
+    for (let y = 0; y < 8; y++) {
+      for (let x = 0; x < 8; x++) bits += g[y * 9 + x] > g[y * 9 + x + 1] ? "1" : "0";
+    }
+    return bits;
+  }
+
+  function hamming(a, b) {
+    let n = 0;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++;
+    return n;
+  }
+
+  async function download(item) {
+    const res = await fetch(item.url);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    let hash = null;
+    try {
+      const img = await loadImage(objUrl);
+      hash = dHash(img);
+    } catch (err) {
+      // 해시 계산이 안 되면 URL 기준 중복 검사만 적용
+    }
+    return { blob, objUrl, hash };
+  }
+
+  // ---------- 화면 ----------
+  function createGroupView(keyword) {
+    const box = document.createElement("section");
+    box.className = "group";
+    const h = document.createElement("h2");
+    h.textContent = keyword;
+    const c = document.createElement("div");
+    c.className = "count";
+    const grid = document.createElement("div");
+    grid.className = "thumbs";
+    box.append(h, c, grid);
+    resultsEl.appendChild(box);
+    return {
+      add(item) {
+        const a = document.createElement("a");
+        a.href = item.objUrl; a.target = "_blank"; a.rel = "noopener";
+        const img = document.createElement("img");
+        img.src = item.objUrl; img.alt = keyword;
+        a.appendChild(img);
+        grid.appendChild(a);
+      },
+      setCount(n) {
+        const old = box.querySelector(".empty");
+        if (n === 0) {
+          c.textContent = "";
+          if (!old) {
+            const p = document.createElement("div");
+            p.className = "empty";
+            p.textContent = "이미지를 찾지 못했습니다. 다른 키워드로 시도해 보세요.";
+            box.appendChild(p);
+          }
+        } else {
+          c.textContent = n + "장";
+          if (old) old.remove();
+        }
+      }
+    };
+  }
+
+  function resetResults() {
+    collected.forEach((g) => g.items.forEach((it) => URL.revokeObjectURL(it.objUrl)));
+    collected = [];
+    resultsEl.innerHTML = "";
+    logEl.innerHTML = "";
+    logEl.hidden = true;
+  }
+
+  function setBusy(v) {
+    busy = v;
+    startBtn.disabled = v;
+    stopBtn.disabled = !v;
+    zipBtn.disabled = v || !collected.some((g) => g.items.length);
+  }
+
+  // ---------- 검색 시작 ----------
+  startBtn.addEventListener("click", async () => {
+    if (busy) return;
+    const keywords = parseList($("keywords").value);
+    const limit = Math.min(50, Math.max(1, parseInt($("limit").value, 10) || 20));
+    const format = $("format").value;
+    const printUrls = $("printUrls").checked;
+
+    if (!keywords.length) {
+      statusText.textContent = "키워드를 한 개 이상 입력하세요.";
+      return;
+    }
+
+    resetResults();
+    cancelled = false;
+    setBusy(true);
+    setProgress(0, 1, "검색을 시작합니다.");
+
+    const seenHashes = [];          // 모든 키워드를 통틀어 이미 채택한 사진의 해시
+    const seenUrls = new Set();     // 모든 키워드를 통틀어 이미 채택한 URL
+    const totalSteps = keywords.length * limit;
+
+    for (let k = 0; k < keywords.length && !cancelled; k++) {
+      const kw = keywords[k];
+      const view = createGroupView(kw);
+      const group = { keyword: kw, items: [] };
+      collected.push(group);
+      let dup = 0, fail = 0;
+
+      log("Item no.: " + (k + 1) + " --> Item name = " + kw);
+      setProgress(k * limit, totalSteps, "검색 중: " + kw + " (" + (k + 1) + "/" + keywords.length + ")");
+
+      let candidates = [];
+      try {
+        candidates = await searchCandidates(kw, format, limit * 3);
+      } catch (err) {
+        log("검색 실패 (" + kw + "): " + err.message, true);
+      }
+      log("후보 " + candidates.length + "장 발견");
+
+      for (let i = 0; i < candidates.length && group.items.length < limit && !cancelled; i += BATCH) {
+        const batch = candidates.slice(i, i + BATCH);
+        const results = await Promise.all(batch.map((it) =>
+          download(it).then((r) => ({ it, r }), (e) => ({ it, e }))
+        ));
+
+        for (const a of results) {
+          if (a.r && group.items.length >= limit) { URL.revokeObjectURL(a.r.objUrl); continue; }
+          if (a.e) { fail++; log("내려받기 실패: " + a.it.url + " (" + a.e.message + ")", true); continue; }
+          const { blob, objUrl, hash } = a.r;
+
+          // 같은 URL이거나 모양이 거의 같은 사진은 제외
+          const sameUrl = seenUrls.has(a.it.url);
+          const sameLook = hash && seenHashes.some((h) => hamming(h, hash) <= HASH_DISTANCE);
+          if (sameUrl || sameLook) {
+            dup++; URL.revokeObjectURL(objUrl); continue;
+          }
+
+          seenUrls.add(a.it.url);
+          if (hash) seenHashes.push(hash);
+          const item = { blob, url: a.it.url, ext: a.it.ext, objUrl };
+          group.items.push(item);
+          view.add(item);
+          view.setCount(group.items.length);
+          if (printUrls) log("Image URL: " + a.it.url);
+          setProgress(k * limit + group.items.length, totalSteps,
+            kw + " (" + (k + 1) + "/" + keywords.length + ") " + group.items.length + "/" + limit + "장");
+        }
+      }
+
+      view.setCount(group.items.length);
+      log("완료: " + group.items.length + "장 (중복 제외 " + dup + ", 오류 " + fail + ")");
+    }
+
+    const total = collected.reduce((n, g) => n + g.items.length, 0);
+    setProgress(1, 1, (cancelled ? "중지됨" : "검색 완료") + ": 총 " + total + "장" +
+      (total ? ". ZIP으로 다운로드할 수 있습니다." : ". 이미지를 찾지 못했습니다."));
+    log("\n이미지 검색 결과: 총 " + total + "장");
+    setBusy(false);
+  });
+
+  stopBtn.addEventListener("click", () => {
+    cancelled = true;
+    statusText.textContent = "중지하는 중...";
+  });
+
+  // ---------- ZIP 다운로드 ----------
+  zipBtn.addEventListener("click", async () => {
+    if (busy) return;
+    if (typeof JSZip === "undefined") {
+      statusText.textContent = "ZIP 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.";
+      return;
+    }
+    setBusy(true);
+    stopBtn.disabled = true;
+
+    const root = safeName($("outdir").value) || "T_data";
+    const zip = new JSZip();
+    const folder = zip.folder(root);
+    let saved = 0;
+
+    for (const group of collected) {
+      if (!group.items.length) continue;
+      const sub = folder.folder(safeName(group.keyword));
+      group.items.forEach((it, i) => {
+        sub.file((i + 1) + "." + group.keyword.replace(/\s+/g, "_") + "." + it.ext, it.blob);
+        saved++;
+      });
+    }
+
+    setProgress(0, 100, "ZIP 파일을 만드는 중...");
+    try {
+      const content = await zip.generateAsync({ type: "blob" }, (m) => setProgress(m.percent, 100));
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(content);
+      a.download = root + ".zip";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+      setProgress(100, 100, "완료: " + saved + "장을 " + root + ".zip 으로 저장했습니다.");
+      log(root + ".zip 저장 완료 (" + saved + "장)");
+    } catch (err) {
+      statusText.textContent = "ZIP 생성에 실패했습니다: " + err.message;
+      log("ZIP 생성 실패: " + err.message, true);
+    }
+    setBusy(false);
+  });
+})();
+</script>
+</body>
+</html>
